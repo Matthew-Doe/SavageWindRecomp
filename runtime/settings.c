@@ -1,4 +1,5 @@
 #include "settings.h"
+#include "amiibo.h"
 
 #include <math.h>
 #include <stdio.h>
@@ -67,6 +68,20 @@ static void pc_controls_env(void) {
     if (cursor) g_settings.pc_cursor = atoi(cursor) != 0;
 }
 
+// Keep the original prototype command working as a startup seed; the UI can change it afterwards.
+static void amiibo_startup_override(void) {
+    const char *v = getenv("SAVAGEWIND_AMIIBO");
+    if (!v || !*v) return;
+    if (!strcmp(v, "off") || !strcmp(v, "0")) { g_settings.virtual_amiibo = false; return; }
+    for (int i = 0; i < AMIIBO_COUNT; i++) {
+        if (strcmp(v, virtual_amiibos[i].key)) continue;
+        g_settings.virtual_amiibo = true;
+        g_settings.amiibo_figure = i;
+        return;
+    }
+    LOG("[nfp] unknown SAVAGEWIND_AMIIBO value: %s\n", v);
+}
+
 // SAVAGEWIND_PC_GYRO / SAVAGEWIND_GYRO_SCENE=0|1: the two shrine apparatus switches at start (Controls changes them)
 static void gyro_startup_overrides(void) {
     const char *v = getenv("SAVAGEWIND_PC_GYRO");
@@ -82,6 +97,7 @@ void settings_load(void) {
     if (!f) {
         gyro_startup_overrides();
         pc_controls_env();
+        amiibo_startup_override();
         return;
     }
     char line[256];
@@ -155,6 +171,11 @@ void settings_load(void) {
         else if (!strcmp(key, "mouse_invert_y")) g_settings.mouse_invert_y = atoi(val) != 0;
         else if (!strcmp(key, "pc_gyro")) g_settings.pc_gyro = atoi(val) != 0;
         else if (!strcmp(key, "gyro_scene")) g_settings.gyro_scene = atoi(val) != 0;
+        else if (!strcmp(key, "virtual_amiibo")) g_settings.virtual_amiibo = atoi(val) != 0;
+        else if (!strcmp(key, "amiibo_figure")) {
+            for (int i = 0; i < AMIIBO_COUNT; i++)
+                if (!strcmp(val, virtual_amiibos[i].key)) g_settings.amiibo_figure = i;
+        }
         else if (!strcmp(key, "motion_sensitivity")) g_settings.motion_sens = (float)atof(val);
         else if (!strcmp(key, "motion_invert")) {  // (off, up_down, left_right, both)
             g_settings.motion_invert = !strcmp(val, "both") ? MOTION_INVERT_UD | MOTION_INVERT_LR :
@@ -255,6 +276,7 @@ void settings_load(void) {
             g_settings.stick_deadzone[i] = STICK_DEADZONE_DEFAULT;
     pc_controls_env();
     gyro_startup_overrides();
+    amiibo_startup_override();
     LOG("[settings] loaded %s\n", SETTINGS_FILE);
 }
 
@@ -302,6 +324,8 @@ void settings_save(void) {
     fprintf(f, "mouse_invert_y = %d\n", g_settings.mouse_invert_y);
     fprintf(f, "pc_gyro = %d\n", g_settings.pc_gyro);
     fprintf(f, "gyro_scene = %d\n", g_settings.gyro_scene);
+    fprintf(f, "virtual_amiibo = %d\n", g_settings.virtual_amiibo);
+    fprintf(f, "amiibo_figure = %s\n", virtual_amiibos[amiibo_valid_figure(g_settings.amiibo_figure)].key);
     fprintf(f, "motion_sensitivity = %.2f\n", g_settings.motion_sens);
     static const char *const inv[4] = {"off", "up_down", "left_right", "both"};
     fprintf(f, "motion_invert = %s\n", inv[g_settings.motion_invert & 3]);
