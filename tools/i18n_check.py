@@ -91,6 +91,7 @@ def looks_like_text(s, in_tr=False):
 
 def keys():
     found = {}
+    found.update({key: 'runtime/amiibo_catalog.h' for key in ('All series', 'Others')})
     for path in SOURCES:
         text = open(path, encoding='utf-8').read()
         lines = text.split('\n')
